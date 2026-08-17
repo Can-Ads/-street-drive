@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Street Drive</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080b10;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#hud{position:fixed;inset:0;pointer-events:none}
+.top{display:flex;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 12px) 14px 0}
+.pill{background:#101722dd;border:1px solid #ffffff22;border-radius:16px;padding:9px 13px;font-weight:700;backdrop-filter:blur(8px)}
+#menu,#garage{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#05070bd9;backdrop-filter:blur(8px);z-index:5}
+.card{width:min(92vw,430px);max-height:88vh;overflow:auto;background:#111722;border:1px solid #ffffff20;border-radius:26px;padding:22px;box-shadow:0 20px 70px #000}
+h1{margin:0 0 8px;font-size:32px} h2{margin:0 0 14px}
+p{color:#aeb7c5}
+button{border:0;border-radius:15px;padding:14px 18px;font-size:16px;font-weight:800;color:white;background:#2377ff;margin:6px;min-height:48px}
+button.secondary{background:#202a38} button.active{outline:2px solid #6aa1ff}
+.row{display:flex;flex-wrap:wrap;gap:5px}
+#controls{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18px);display:flex;justify-content:space-between;align-items:end;padding:0 18px;pointer-events:none}
+.pad{display:grid;grid-template-columns:68px 68px 68px;grid-template-rows:58px 58px;gap:7px;pointer-events:auto}
+.ctrl{width:68px;height:58px;margin:0;border-radius:18px;background:#111a27dd;border:1px solid #ffffff22;font-size:25px;padding:0}
+.accel{display:flex;gap:8px;pointer-events:auto}.accel .ctrl{width:82px;height:116px}
+.small{font-size:13px;color:#8f9aaa}
+#speed{font-size:22px}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+  <div class="top">
+    <div class="pill">💰 <span id="money">0</span></div>
+    <div class="pill"><span id="speed">0</span> km/h</div>
+    <button id="pause" class="ctrl" style="pointer-events:auto;width:52px;height:46px;margin:0">Ⅱ</button>
+  </div>
+</div>
+
+<div id="controls">
+  <div class="pad">
+    <button class="ctrl" data-key="left">◀</button><button class="ctrl" data-key="brake">▼</button><button class="ctrl" data-key="right">▶</button>
+  </div>
+  <div class="accel">
+    <button class="ctrl" data-key="hand">↻</button>
+    <button class="ctrl" data-key="gas">▲</button>
+  </div>
+</div>
+
+<div id="menu">
+ <div class="card">
+  <h1>STREET DRIVE</h1>
+  <p>Şehirde serbest sürüş. Gazla hızlan, direksiyonla dön, para topla ve aracını geliştir.</p>
+  <button id="resume">DEVAM ET</button>
+  <button id="openGarage" class="secondary">GARAGE / MODİFİYE</button>
+  <p class="small">İlk sürüm • mobil dokunmatik kontroller • oyun içi satın alma yok</p>
+ </div>
+</div>
+
+<div id="garage">
+ <div class="card">
+  <h2>🚘 GARAGE</h2>
+  <p>Aracını seç ve görünüşünü değiştir.</p>
+  <div class="row" id="cars">
+   <button data-car="black">Night GT</button><button data-car="red">Red Sport</button><button data-car="white">White Lux</button>
+  </div>
+  <h3>Jant</h3>
+  <div class="row"><button data-wheel="0">Standart</button><button data-wheel="1">Sport</button><button data-wheel="2">Luxury</button></div>
+  <h3>Gövde yüksekliği</h3>
+  <div class="row"><button data-lower="-1">Alçak</button><button data-lower="0">Normal</button><button data-lower="1">Yüksek</button></div>
+  <button id="closeGarage" class="secondary">SÜRÜŞE DÖN</button>
+ </div>
+</div>
+
+<script>
+const c=document.getElementById('game'),ctx=c.getContext('2d');
+let W,H,dpr; function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)} addEventListener('resize',resize);resize();
+
+const keys={left:false,right:false,gas:false,brake:false,hand:false};
+document.querySelectorAll('[data-key]').forEach(b=>{
+ const k=b.dataset.key;
+ const on=e=>{e.preventDefault();keys[k]=true;b.style.transform='scale(.94)'};
+ const off=e=>{e.preventDefault();keys[k]=false;b.style.transform=''};
+ b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off); b.addEventListener('pointercancel',off); b.addEventListener('pointerleave',off);
+});
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft')keys.left=true;if(e.key==='ArrowRight')keys.right=true;if(e.key==='ArrowUp')keys.gas=true;if(e.key==='ArrowDown')keys.brake=true});
+addEventListener('keyup',e=>{if(e.key==='ArrowLeft')keys.left=false;if(e.key==='ArrowRight')keys.right=false;if(e.key==='ArrowUp')keys.gas=false;if(e.key==='ArrowDown')keys.brake=false});
+
+let car={x:0,y:0,a:-Math.PI/2,v:0,color:'#151922',wheel:0,lower:0};
+let money=0, paused=false, last=performance.now(), roadOffset=0;
+const coins=[];
+for(let i=0;i<35;i++)coins.push({x:(Math.random()*2-1)*700,y:(Math.random()*2-1)*450,got:false});
+
+function worldToScreen(x,y){return {x:W/2+(x-car.x),y:H/2+(y-car.y)}}
+function road(){
+ ctx.fillStyle='#17321f';ctx.fillRect(0,0,W,H);
+ // large city blocks
+ const grid=110;
+ for(let x=(-((car.x%grid)+grid)%grid);x<W;x+=grid){ctx.fillStyle='#26362d';ctx.fillRect(x,0,92,H)}
+ for(let y=(-((car.y%grid)+grid)%grid);y<H;y+=grid){ctx.fillStyle='#26362d';ctx.fillRect(0,y,W,92)}
+ // asphalt roads
+ ctx.fillStyle='#24282d';
+ for(let x=(-((car.x%grid)+grid)%grid);x<W;x+=grid)ctx.fillRect(x,0,92,H);
+ for(let y=(-((car.y%grid)+grid)%grid);y<H;y+=grid)ctx.fillRect(0,y,W,92);
+ // lane markings
+ ctx.strokeStyle='#d4c86a';ctx.lineWidth=2;ctx.setLineDash([18,18]);
+ for(let x=(-((car.x%grid)+grid)%grid)+46;x<W;x+=grid){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+ for(let y=(-((car.y%grid)+grid)%grid)+46;y<H;y+=grid){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+ ctx.setLineDash([]);
+ // buildings
+ for(let gx=(-((car.x%grid)+grid)%grid)+4;gx<W;gx+=grid)for(let gy=(-((car.y%grid)+grid)%grid)+4;gy<H;gy+=grid){
+   ctx.fillStyle=['#334052','#3a3945','#2d3b46','#41434b'][(Math.floor((gx+gy)/grid)%4)];
+   ctx.fillRect(gx,gy,32,32);
+ }
+}
+function drawCoin(p){
+ let s=worldToScreen(p.x,p.y); if(s.x<-30||s.x>W+30||s.y<-30||s.y>H+30)return;
+ ctx.save();ctx.translate(s.x,s.y);ctx.rotate(performance.now()/500);
+ ctx.fillStyle='#ffd83d';ctx.beginPath();ctx.arc(0,0,10,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle='#8b5b00';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('$',0,1);ctx.restore();
+}
+function drawCar(){
+ ctx.save();ctx.translate(W/2,H/2);ctx.rotate(car.a+Math.PI/2);
+ const lift=car.lower===-1?5:car.lower===1?-2:0;
+ // shadow
+ ctx.fillStyle='#0008';ctx.beginPath();ctx.ellipse(0,8,25,48,0,0,Math.PI*2);ctx.fill();
+ // wheels
+ ctx.fillStyle='#080a0d';for(const y of [-30,30]){ctx.fillRect(-18,y-7,9,14);ctx.fillRect(9,y-7,9,14)}
+ // body
+ ctx.fillStyle=car.color;ctx.beginPath();ctx.roundRect(-18,-42+lift,36,84,9);ctx.fill();
+ // glass
+ ctx.fillStyle='#6f879d';ctx.beginPath();ctx.roundRect(-13,-25+lift,26,22,6);ctx.fill();
+ ctx.fillStyle='#34495a';ctx.beginPath();ctx.roundRect(-13,4+lift,26,17,5);ctx.fill();
+ // lights
+ ctx.fillStyle='#fff2c7';ctx.fillRect(-14,-40+lift,8,4);ctx.fillRect(6,-40+lift,8,4);
+ ctx.fillStyle='#ff3d45';ctx.fillRect(-14,36+lift,8,4);ctx.fillRect(6,36+lift,8,4);
+ ctx.restore();
+}
+function update(dt){
+ if(paused)return;
+ const max=keys.gas?7:4.5;
+ if(keys.gas)car.v+=12*dt; else car.v-=3.5*dt;
+ if(keys.brake)car.v-=18*dt;
+ car.v=Math.max(-2,Math.min(max,car.v));
+ if(Math.abs(car.v)>0.05)car.a+=(keys.right?1:0)*1.9*dt*(car.v/4)-(keys.left?1:0)*1.9*dt*(car.v/4);
+ car.x+=Math.cos(car.a)*car.v*60*dt;car.y+=Math.sin(car.a)*car.v*60*dt;
+ for(const p of coins)if(!p.got&&Math.hypot(p.x-car.x,p.y-car.y)<28){p.got=true;money+=10;document.getElementById('money').textContent=money}
+ document.getElementById('speed').textContent=Math.round(Math.abs(car.v)*28);
+}
+function draw(){road();coins.forEach(p=>{if(!p.got)drawCoin(p)});drawCar();requestAnimationFrame(loop)}
+function loop(t){let dt=Math.min((t-last)/1000,.05);last=t;update(dt);draw()}
+document.getElementById('pause').onclick=()=>{paused=!paused;document.getElementById('menu').style.display=paused?'flex':'none'};
+document.getElementById('resume').onclick=()=>{paused=false;document.getElementById('menu').style.display='none'};
+document.getElementById('openGarage').onclick=()=>{document.getElementById('menu').style.display='none';document.getElementById('garage').style.display='flex'};
+document.getElementById('closeGarage').onclick=()=>{document.getElementById('garage').style.display='none';paused=false};
+document.querySelectorAll('[data-car]').forEach(b=>b.onclick=()=>{car.color={black:'#151922',red:'#9d1621',white:'#e7e9ec'}[b.dataset.car]});
+document.querySelectorAll('[data-wheel]').forEach(b=>b.onclick=()=>car.wheel=+b.dataset.wheel);
+document.querySelectorAll('[data-lower]').forEach(b=>b.onclick=()=>car.lower=+b.dataset.lower);
+loop(performance.now());
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Street Drive Ultimate</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#111;font-family:Arial,sans-serif;touch-action:none}
+canvas{display:block;width:100%;height:100%;background:linear-gradient(#6fa9d6 0 52%,#505050 52% 100%)}
+#hud{position:fixed;inset:0;pointer-events:none;color:white}
+#title{position:absolute;top:18px;left:18px;font-weight:800;font-size:18px;text-shadow:0 2px 5px #000}
+#speed{position:absolute;right:18px;top:18px;font-size:25px;font-weight:800;text-shadow:0 2px 5px #000}
+.btn{position:absolute;bottom:28px;width:78px;height:78px;border-radius:50%;border:2px solid #fff8;background:#111b;color:#fff;font-size:30px;pointer-events:auto}
+#left{left:22px}#right{left:112px}#gas{right:22px}#brake{right:112px}
+#hint{position:absolute;top:52px;left:18px;font-size:12px;opacity:.8}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+<div id="title">STREET DRIVE: ULTIMATE • PROTOTYPE</div>
+<div id="hint">Serbest sürüş • Mobil prototip</div>
+<div id="speed">0 KM/H</div>
+<button class="btn" id="left">‹</button><button class="btn" id="right">›</button>
+<button class="btn" id="brake">●</button><button class="btn" id="gas">▲</button>
+</div>
+<script>
+const c=document.getElementById('game'),x=c.getContext('2d');
+let W,H;function resize(){W=c.width=innerWidth*devicePixelRatio;H=c.height=innerHeight*devicePixelRatio;x.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);W=innerWidth;H=innerHeight}addEventListener('resize',resize);resize();
+const keys={left:false,right:false,gas:false,brake:false};
+function bind(id,k){let b=document.getElementById(id);['touchstart','mousedown'].forEach(e=>b.addEventListener(e,a=>{a.preventDefault();keys[k]=true}));['touchend','touchcancel','mouseup','mouseleave'].forEach(e=>b.addEventListener(e,a=>{a.preventDefault();keys[k]=false}))}
+bind('left','left');bind('right','right');bind('gas','gas');bind('brake','brake');
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft')keys.left=true;if(e.key==='ArrowRight')keys.right=true;if(e.key==='ArrowUp')keys.gas=true;if(e.key===' ')keys.brake=true});
+addEventListener('keyup',e=>{if(e.key==='ArrowLeft')keys.left=false;if(e.key==='ArrowRight')keys.right=false;if(e.key==='ArrowUp')keys.gas=false;if(e.key===' ')keys.brake=false});
+let car={x:0,y:0,a:-Math.PI/2,v:0};let t=0;
+function road(px,py){x.save();x.translate(W/2,H*.58);x.rotate(-car.a-Math.PI/2);let rw=Math.max(W*.55,420);x.fillStyle='#24272b';x.fillRect(-rw/2,-2000,rw,4000);x.strokeStyle='#f4d34e';x.lineWidth=4;x.setLineDash([28,28]);x.beginPath();x.moveTo(0,-2000);x.lineTo(0,2000);x.stroke();x.setLineDash([]);x.restore()}
+function draw(){x.clearRect(0,0,W,H);
+ // city blocks
+ x.fillStyle='#4b4b4b';for(let i=-8;i<9;i++){let yy=((i*150-car.y*.55)%1200)-600;x.fillRect(0,yy,Math.max(0,W*.22),110);x.fillRect(W-Math.max(0,W*.22),yy,Math.max(0,W*.22),110)}
+ road();
+ // car
+ x.save();x.translate(W/2,H*.58);x.rotate(car.a+Math.PI/2);x.shadowColor='#000';x.shadowBlur=18;x.fillStyle='#111';x.fillRect(-34,-62,68,124);x.shadowBlur=0;x.fillStyle='#c7d4df';x.fillRect(-25,-30,50,42);x.fillStyle='#151a20';x.fillRect(-29,27,58,24);x.fillStyle='#e7e7e7';x.fillRect(-31,-62,62,8);x.restore();
+ document.getElementById('speed').textContent=Math.round(Math.abs(car.v)*3.6)+' KM/H';
+}
+function loop(){let dt=.016;if(keys.gas)car.v+=.10;if(keys.brake)car.v-=.16;if(!keys.gas&&!keys.brake)car.v*=.985;car.v=Math.max(-7,Math.min(32,car.v));let steer=(keys.right?1:0)-(keys.left?1:0);car.a+=steer*.035*(.3+Math.min(1,Math.abs(car.v)/8));car.x+=Math.cos(car.a)*car.v;car.y+=Math.sin(car.a)*car.v;t+=dt;draw();requestAnimationFrame(loop)}loop();
+</script>
+</body>
+</html>
